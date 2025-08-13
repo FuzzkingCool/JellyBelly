@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore JellyBelly.sln
+      - name: Build
+        run: dotnet build --configuration Release --no-restore JellyBelly.sln
+      - name: Test
+        run: dotnet test --configuration Release --no-build JellyBelly.sln
+      - name: Pack plugin artifact
+        run: |
+          mkdir -p artifact
+          cp -r JellyBelly/Jellyfin.Plugin.LocalRecs/bin/Release/net8.0/* artifact/
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jellyfin.Plugin.LocalRecs
+          path: artifact
+
+
