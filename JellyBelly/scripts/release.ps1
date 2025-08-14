@@ -25,9 +25,46 @@ function Resolve-PathStrict([string]$path) {
   return $full
 }
 
+function Update-CsprojVersion([string]$csprojPath, [string]$version) {
+  if (!(Test-Path $csprojPath)) { throw "csproj not found: $csprojPath" }
+  $text = Get-Content -Path $csprojPath -Raw
+  $asmVersion = if ($version -match '^\d+\.\d+\.\d+($|[^\d])') { "$version.0" } else { "$version.0" }
+  $fileVersion = $asmVersion
+  $infoVersion = $version
+
+  $replaced = $false
+  foreach ($tag in @(
+      @{ Name = 'Version'; Value = $version },
+      @{ Name = 'AssemblyVersion'; Value = $asmVersion },
+      @{ Name = 'FileVersion'; Value = $fileVersion },
+      @{ Name = 'InformationalVersion'; Value = $infoVersion }
+    )) {
+    $pattern = "<" + $tag.Name + ">.*?</" + $tag.Name + ">"
+    $replacement = "<" + $tag.Name + ">" + $tag.Value + "</" + $tag.Name + ">"
+    if ($text -match $pattern) {
+      $text = [System.Text.RegularExpressions.Regex]::Replace($text, $pattern, $replacement, 'Singleline')
+      $replaced = $true
+    } else {
+      # Insert before the first closing PropertyGroup
+      $insert = "  " + $replacement + "`r`n"
+      $idx = $text.IndexOf('</PropertyGroup>')
+      if ($idx -ge 0) {
+        $text = $text.Insert($idx, $insert)
+        $replaced = $true
+      }
+    }
+  }
+  if ($replaced) {
+    Set-Content -Path $csprojPath -Value $text -Encoding UTF8
+  }
+}
+
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Resolve-PathStrict (Join-Path $scriptRoot '..')
 $repoRoot = Resolve-PathStrict (Join-Path $projectRoot '..')
+
+$csprojPath = Join-Path $repoRoot 'JellyBelly/Jellyfin.Plugin.JellyBelly/Jellyfin.Plugin.JellyBelly.csproj'
+Update-CsprojVersion -csprojPath $csprojPath -version $Version
 
 $slnPath = Join-Path $repoRoot 'JellyBelly.sln'
 Write-Host "Building solution: $slnPath"
