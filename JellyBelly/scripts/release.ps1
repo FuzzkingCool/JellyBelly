@@ -164,64 +164,53 @@ if ($UpdateManifestRepo) {
   }
 
   $newEntry = $manifestObj[0]
-  if ($doc -eq $null) {
-    # Create new file with our manifest content
-    $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($manifestJson))
+  $hasExisting = ($current -and $current.sha)
+  if (-not $hasExisting) {
+    # Create new file with our manifest content (top-level array)
+    $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($manifestArray | ConvertTo-Json -Depth 6)))
     try {
       gh api "repos/$ManifestRepoOwner/$ManifestRepo/contents/$ManifestRepoPath" `
         -X PUT `
-        -f message="Update manifest for JellyBelly $Version" `
+        -f message="Create manifest for JellyBelly $Version" `
         -f branch="$ManifestRepoBranch" `
         -f content="$b64" | Out-Host
     } catch {
       $apiSucceeded = $false
     }
   } else {
-    # Merge into existing top-level array
-    if ($doc -is [System.Array]) {
-      $arr = @()
-      $arr += $doc
-    } else {
-      $arr = @($doc)
-    }
-    $found = $false
-    for ($i = 0; $i -lt $arr.Count; $i++) {
-      if ($arr[$i].guid -eq $newEntry.guid) {
-        $found = $true
-        # Prepend version into existing versions array
-        $versions = @()
-        $versions += $newEntry.versions[0]
-        if ($arr[$i].versions) { $versions += $arr[$i].versions }
-        $arr[$i].versions = $versions
-        # Keep other fields up-to-date
-        $arr[$i].name = $newEntry.name
-        $arr[$i].description = $newEntry.description
-        $arr[$i].overview = $newEntry.overview
-        $arr[$i].owner = $newEntry.owner
-        $arr[$i].category = $newEntry.category
-        break
+    # Update existing file. If JSON parsed, merge; otherwise overwrite with correct array.
+    if ($doc -ne $null) {
+      if ($doc -is [System.Array]) { $arr = @(); $arr += $doc } else { $arr = @($doc) }
+      $found = $false
+      for ($i = 0; $i -lt $arr.Count; $i++) {
+        if ($arr[$i].guid -eq $newEntry.guid) {
+          $found = $true
+          $versions = @(); $versions += $newEntry.versions[0]
+          if ($arr[$i].versions) { $versions += $arr[$i].versions }
+          $arr[$i].versions = $versions
+          $arr[$i].name = $newEntry.name
+          $arr[$i].description = $newEntry.description
+          $arr[$i].overview = $newEntry.overview
+          $arr[$i].owner = $newEntry.owner
+          $arr[$i].category = $newEntry.category
+          break
+        }
       }
+      if (-not $found) { $arr += $newEntry }
+      $updatedJson = ($arr | ConvertTo-Json -Depth 6)
+    } else {
+      $updatedJson = ($manifestArray | ConvertTo-Json -Depth 6)
     }
-    if (-not $found) {
-      $arr += $newEntry
-    }
-    $updatedJson = ($arr | ConvertTo-Json -Depth 6)
     $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($updatedJson))
     $putArgs = @(
       "repos/$ManifestRepoOwner/$ManifestRepo/contents/$ManifestRepoPath",
       "-X", "PUT",
       "-f", "message=Update manifest for JellyBelly $Version",
       "-f", "branch=$ManifestRepoBranch",
-      "-f", "content=$b64"
+      "-f", "content=$b64",
+      "-f", "sha=$($current.sha)"
     )
-    if ($current -and $current.sha) {
-      $putArgs += @("-f", "sha=$($current.sha)")
-    }
-    try {
-      gh api @putArgs | Out-Host
-    } catch {
-      $apiSucceeded = $false
-    }
+    try { gh api @putArgs | Out-Host } catch { $apiSucceeded = $false }
   }
   if (-not $apiSucceeded) {
     Write-Host "API update failed; falling back to git clone workflow"
