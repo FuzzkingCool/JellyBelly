@@ -1,18 +1,20 @@
-﻿{
-    "guid":  "f8fa0c88-7b8f-4c21-9da3-62d0fb1b9a54",
-    "name":  "JellyBelly",
-    "description":  "Generates all-local Netflix-style recommendations per user using TF-IDF and optional ML.NET",
-    "overview":  "Generates all-local Netflix-style recommendations per user using TF-IDF and optional ML.NET",
-    "owner":  "FuzzkingCool",
-    "category":  "General",
-    "versions":  [
-                     {
-                         "version":  "0.3.7",
-                         "changelog":  "Release",
-                         "targetAbi":  "10.9.0.0",
-                         "sourceUrl":  "https://github.com/FuzzkingCool/JellyBelly/releases/download/0.3.7/Jellyfin-Plugin-JellyBelly.zip",
-                         "checksum":  "5CB024BC2D802CC838B327E2EFEC6A09",
-                         "timestamp":  "2025-08-14T02:03:23.0315200Z"
-                     }
-                 ]
-}
+[
+  {
+    "guid": "f8fa0c88-7b8f-4c21-9da3-62d0fb1b9a54",
+    "name": "JellyBelly",
+    "description": "Generates all-local Netflix-style recommendations per user using TF-IDF and optional ML.NET",
+    "overview": "Generates all-local Netflix-style recommendations per user using TF-IDF and optional ML.NET",
+    "owner": "FuzzkingCool",
+    "category": "General",
+    "versions": [
+      {
+        "version": "0.3.7",
+        "changelog": "Release",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/FuzzkingCool/JellyBelly/releases/download/0.3.7/Jellyfin-Plugin-JellyBelly.zip",
+        "checksum": "5CB024BC2D802CC838B327E2EFEC6A09",
+        "timestamp": "2025-08-14T01:33:00Z"
+      }
+    ]
+  }
+]
