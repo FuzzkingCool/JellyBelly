@@ -3,16 +3,16 @@
     "name":  "JellyBelly",
     "description":  "Generates all-local Netflix-style recommendations per user using TF-IDF and optional ML.NET",
     "overview":  "Generates all-local Netflix-style recommendations per user using TF-IDF and optional ML.NET",
-    "owner":  "0.3.1",
+    "owner":  "FuzzkingCool",
     "category":  "General",
     "versions":  [
                      {
-                         "version":  "--Version",
+                         "version":  "0.3.2",
                          "changelog":  "Release",
                          "targetAbi":  "10.9.0.0",
-                         "sourceUrl":  "https://github.com/0.3.1/JellyBelly/releases/download/--Version/Jellyfin-Plugin-JellyBelly.zip",
-                         "checksum":  "E03853AB9BEDC951F4015ED09264A8A7",
-                         "timestamp":  "2025-08-14T01:21:40.5193556Z"
+                         "sourceUrl":  "https://github.com/FuzzkingCool/JellyBelly/releases/download/0.3.2/Jellyfin-Plugin-JellyBelly.zip",
+                         "checksum":  "3A7E16EC97826134C7525D2EC83B5F5E",
+                         "timestamp":  "2025-08-14T01:22:09.6884517Z"
                      }
                  ]
 }
