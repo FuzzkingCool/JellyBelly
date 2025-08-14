@@ -126,112 +126,51 @@ if ($UpdateManifestRepo) {
   if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     throw 'GitHub CLI (gh) is required to update the manifest repo. Install from https://cli.github.com/ and run gh auth login.'
   }
-  # Auto-detect default branch if reachable
+  # Ensure manifest repo exists; create if missing
+  $repoExists = $true
+  try { gh repo view "$ManifestRepoOwner/$ManifestRepo" 1>$null 2>$null } catch { $repoExists = $false }
+  if (-not $repoExists) {
+    Write-Host "Creating manifest repo $ManifestRepoOwner/$ManifestRepo (public)"
+    gh repo create "$ManifestRepoOwner/$ManifestRepo" --public -y | Out-Host
+  }
+  # Detect default branch; fall back between master/main
   try {
     $detected = gh repo view "$ManifestRepoOwner/$ManifestRepo" --json defaultBranchRef -q .defaultBranchRef.name 2>$null
     if ($detected -and $detected.Trim().Length -gt 0) { $ManifestRepoBranch = $detected.Trim() }
   } catch { }
+  if (-not $ManifestRepoBranch) { $ManifestRepoBranch = 'master' }
   Write-Host "Updating remote manifest repository: $ManifestRepoOwner/$ManifestRepo@$ManifestRepoBranch/$ManifestRepoPath"
-  # Fetch current file to get sha
-  $getCmd = "repos/$ManifestRepoOwner/$ManifestRepo/contents/$ManifestRepoPath?ref=$ManifestRepoBranch"
-  $apiSucceeded = $true
+
+  $tmp = Join-Path $env:TEMP ("manifest_" + [System.Guid]::NewGuid().ToString('N'))
+  # Try clone with detected branch; else fallback to main/master
+  $cloned = $false
   try {
-    $current = gh api $getCmd --jq '{sha: .sha, content: .content, encoding: .encoding}' | ConvertFrom-Json
-    $existingJson = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(($current.content -replace "\n", "")))
-    $doc = $null
-    try { $doc = $existingJson | ConvertFrom-Json } catch { $doc = $null }
+    gh repo clone "$ManifestRepoOwner/$ManifestRepo" "$tmp" -- -b "$ManifestRepoBranch" | Out-Host
+    $cloned = $true
   } catch {
-    $apiSucceeded = $false
-    $current = $null
-    $doc = $null
-  }
-  # If initial GET failed, try alternate common branch name once
-  if (-not $apiSucceeded) {
     $altBranch = if ($ManifestRepoBranch -eq 'master') { 'main' } else { 'master' }
     try {
-      Write-Host "Retrying GET using branch '$altBranch'"
-      $current = gh api "repos/$ManifestRepoOwner/$ManifestRepo/contents/$ManifestRepoPath?ref=$altBranch" --jq '{sha: .sha, content: .content, encoding: .encoding}' | ConvertFrom-Json
-      $existingJson = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(($current.content -replace "\n", "")))
-      $doc = $null
-      try { $doc = $existingJson | ConvertFrom-Json } catch { $doc = $null }
+      gh repo clone "$ManifestRepoOwner/$ManifestRepo" "$tmp" -- -b "$altBranch" | Out-Host
       $ManifestRepoBranch = $altBranch
-      $apiSucceeded = $true
-    } catch {
-      $apiSucceeded = $false
-      $current = $null
-      $doc = $null
-    }
-  }
-
-  $newEntry = $manifestObj[0]
-  $hasExisting = ($current -and $current.sha)
-  if (-not $hasExisting) {
-    # Create new file with our manifest content (top-level array)
-    $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($manifestArray | ConvertTo-Json -Depth 6)))
-    try {
-      gh api "repos/$ManifestRepoOwner/$ManifestRepo/contents/$ManifestRepoPath" `
-        -X PUT `
-        -f message="Create manifest for JellyBelly $Version" `
-        -f branch="$ManifestRepoBranch" `
-        -f content="$b64" | Out-Host
-    } catch {
-      $apiSucceeded = $false
-    }
-  } else {
-    # Update existing file. If JSON parsed, merge; otherwise overwrite with correct array.
-    if ($doc -ne $null) {
-      if ($doc -is [System.Array]) { $arr = @(); $arr += $doc } else { $arr = @($doc) }
-      $found = $false
-      for ($i = 0; $i -lt $arr.Count; $i++) {
-        if ($arr[$i].guid -eq $newEntry.guid) {
-          $found = $true
-          $versions = @(); $versions += $newEntry.versions[0]
-          if ($arr[$i].versions) { $versions += $arr[$i].versions }
-          $arr[$i].versions = $versions
-          $arr[$i].name = $newEntry.name
-          $arr[$i].description = $newEntry.description
-          $arr[$i].overview = $newEntry.overview
-          $arr[$i].owner = $newEntry.owner
-          $arr[$i].category = $newEntry.category
-          break
-        }
-      }
-      if (-not $found) { $arr += $newEntry }
-      $updatedJson = ($arr | ConvertTo-Json -Depth 6)
-    } else {
-      $updatedJson = ($manifestArray | ConvertTo-Json -Depth 6)
-    }
-    $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($updatedJson))
-    $putArgs = @(
-      "repos/$ManifestRepoOwner/$ManifestRepo/contents/$ManifestRepoPath",
-      "-X", "PUT",
-      "-f", "message=Update manifest for JellyBelly $Version",
-      "-f", "branch=$ManifestRepoBranch",
-      "-f", "content=$b64",
-      "-f", "sha=$($current.sha)"
-    )
-    try { gh api @putArgs | Out-Host } catch { $apiSucceeded = $false }
-  }
-  if (-not $apiSucceeded) {
-    Write-Host "API update failed; falling back to git clone workflow"
-    $tmp = Join-Path $env:TEMP ("manifest_" + [System.Guid]::NewGuid().ToString('N'))
-    # Try clone with detected branch; if it fails, try alternate branch
-    $cloned = $false
-    try {
-      gh repo clone "$ManifestRepoOwner/$ManifestRepo" "$tmp" -- -b "$ManifestRepoBranch" | Out-Host
       $cloned = $true
     } catch {
-      $altBranch = if ($ManifestRepoBranch -eq 'master') { 'main' } else { 'master' }
-      try {
-        gh repo clone "$ManifestRepoOwner/$ManifestRepo" "$tmp" -- -b "$altBranch" | Out-Host
-        $ManifestRepoBranch = $altBranch
-        $cloned = $true
-      } catch { $cloned = $false }
+      # Last try: clone default and checkout/create branch
+      gh repo clone "$ManifestRepoOwner/$ManifestRepo" "$tmp" | Out-Host
+      $cloned = $true
     }
-    if (-not $cloned) { throw "Failed to clone $ManifestRepoOwner/$ManifestRepo on master/main" }
+  }
+  if (-not $cloned) { throw "Failed to clone $ManifestRepoOwner/$ManifestRepo" }
+
+  Push-Location $tmp
+  try {
+    # Ensure branch exists
+    try { git checkout "$ManifestRepoBranch" 2>$null | Out-Null } catch {
+      git checkout -b "$ManifestRepoBranch" | Out-Host
+    }
     $mfPath = Join-Path $tmp $ManifestRepoPath
     New-Item -ItemType Directory -Path (Split-Path -Parent $mfPath) -Force | Out-Null
-    $merged = $null
+    $newEntry = $manifestObj[0]
+    $manifestArrayText = ($manifestArray | ConvertTo-Json -Depth 6)
     if (Test-Path $mfPath) {
       try {
         $txt = Get-Content $mfPath -Raw -ErrorAction Stop
@@ -253,21 +192,17 @@ if ($UpdateManifestRepo) {
           }
         }
         if (-not $found) { $arr += $newEntry }
-        $merged = ($arr | ConvertTo-Json -Depth 6)
+        ($arr | ConvertTo-Json -Depth 6) | Out-File -FilePath $mfPath -Encoding UTF8 -Force
       } catch {
-        $merged = ($manifestArray | ConvertTo-Json -Depth 6)
+        $manifestArrayText | Out-File -FilePath $mfPath -Encoding UTF8 -Force
       }
     } else {
-      $merged = ($manifestArray | ConvertTo-Json -Depth 6)
+      $manifestArrayText | Out-File -FilePath $mfPath -Encoding UTF8 -Force
     }
-    $merged | Out-File -FilePath $mfPath -Encoding UTF8 -Force
-    Push-Location $tmp
-    try {
-      git add "$ManifestRepoPath" | Out-Null
-      git commit -m "Update manifest for JellyBelly $Version" | Out-Host
-      git push origin "$ManifestRepoBranch" | Out-Host
-    } finally { Pop-Location }
-  }
+    git add "$ManifestRepoPath" | Out-Null
+    git commit -m "Update manifest for JellyBelly $Version" | Out-Host
+    git push origin "$ManifestRepoBranch" | Out-Host
+  } finally { Pop-Location }
 }
 
 Write-Host "Done"
