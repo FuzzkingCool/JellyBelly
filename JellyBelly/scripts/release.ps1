@@ -129,12 +129,14 @@ if ($UpdateManifestRepo) {
   Write-Host "Updating remote manifest repository: $ManifestRepoOwner/$ManifestRepo@$ManifestRepoBranch/$ManifestRepoPath"
   # Fetch current file to get sha
   $getCmd = "repos/$ManifestRepoOwner/$ManifestRepo/contents/$ManifestRepoPath?ref=$ManifestRepoBranch"
+  $apiSucceeded = $true
   try {
     $current = gh api $getCmd --jq '{sha: .sha, content: .content, encoding: .encoding}' | ConvertFrom-Json
     $existingJson = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(($current.content -replace "\n", "")))
     $doc = $null
     try { $doc = $existingJson | ConvertFrom-Json } catch { $doc = $null }
   } catch {
+    $apiSucceeded = $false
     $current = $null
     $doc = $null
   }
@@ -189,7 +191,54 @@ if ($UpdateManifestRepo) {
     if ($current -and $current.sha) {
       $putArgs += @("-f", "sha=$($current.sha)")
     }
-    gh api @putArgs | Out-Host
+    try {
+      gh api @putArgs | Out-Host
+    } catch {
+      $apiSucceeded = $false
+    }
+  }
+  if (-not $apiSucceeded) {
+    Write-Host "API update failed; falling back to git clone workflow"
+    $tmp = Join-Path $env:TEMP ("manifest_" + [System.Guid]::NewGuid().ToString('N'))
+    gh repo clone "$ManifestRepoOwner/$ManifestRepo" "$tmp" -- -b "$ManifestRepoBranch" | Out-Host
+    $mfPath = Join-Path $tmp $ManifestRepoPath
+    New-Item -ItemType Directory -Path (Split-Path -Parent $mfPath) -Force | Out-Null
+    $merged = $null
+    if (Test-Path $mfPath) {
+      try {
+        $txt = Get-Content $mfPath -Raw -ErrorAction Stop
+        $existing = $txt | ConvertFrom-Json -ErrorAction Stop
+        if ($existing -is [System.Array]) { $arr = @(); $arr += $existing } else { $arr = @($existing) }
+        $found = $false
+        for ($i = 0; $i -lt $arr.Count; $i++) {
+          if ($arr[$i].guid -eq $newEntry.guid) {
+            $found = $true
+            $versions = @(); $versions += $newEntry.versions[0]
+            if ($arr[$i].versions) { $versions += $arr[$i].versions }
+            $arr[$i].versions = $versions
+            $arr[$i].name = $newEntry.name
+            $arr[$i].description = $newEntry.description
+            $arr[$i].overview = $newEntry.overview
+            $arr[$i].owner = $newEntry.owner
+            $arr[$i].category = $newEntry.category
+            break
+          }
+        }
+        if (-not $found) { $arr += $newEntry }
+        $merged = ($arr | ConvertTo-Json -Depth 6)
+      } catch {
+        $merged = ($manifestArray | ConvertTo-Json -Depth 6)
+      }
+    } else {
+      $merged = ($manifestArray | ConvertTo-Json -Depth 6)
+    }
+    $merged | Out-File -FilePath $mfPath -Encoding UTF8 -Force
+    Push-Location $tmp
+    try {
+      git add "$ManifestRepoPath" | Out-Null
+      git commit -m "Update manifest for JellyBelly $Version" | Out-Host
+      git push origin "$ManifestRepoBranch" | Out-Host
+    } finally { Pop-Location }
   }
 }
 
