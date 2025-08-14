@@ -73,14 +73,14 @@ $manifestObj = @(
   }
 )
 
-$manifestJson = $manifestObj | ConvertTo-Json -Depth 6
+$manifestJson = ConvertTo-Json -InputObject $manifestObj -Depth 6
 $manifestOut = if ($ManifestPath) { Resolve-PathStrict $ManifestPath } else { Join-Path $outDir 'manifest.json' }
 Write-Host "Writing manifest: $manifestOut"
 <#
   Ensure top-level JSON array on disk regardless of PowerShell quirks
 #>
 # Always write as array from source object
-($manifestObj | ConvertTo-Json -Depth 6) | Out-File -FilePath $manifestOut -Encoding UTF8 -Force
+$manifestJson | Out-File -FilePath $manifestOut -Encoding UTF8 -Force
 
 # Optionally push current branch (independent of release)
 if ($Push) {
@@ -169,7 +169,7 @@ if ($UpdateManifestRepo) {
     $mfPath = Join-Path $tmp $ManifestRepoPath
     New-Item -ItemType Directory -Path (Split-Path -Parent $mfPath) -Force | Out-Null
     $newEntry = $manifestObj[0]
-    $manifestArrayText = ($manifestObj | ConvertTo-Json -Depth 6)
+    $manifestArrayText = (ConvertTo-Json -InputObject $manifestObj -Depth 6)
     # Always overwrite with a valid top-level array to avoid bad shapes lingering
     $manifestArrayText | Out-File -FilePath $mfPath -Encoding UTF8 -Force
     git add "$ManifestRepoPath" | Out-Null
