@@ -76,7 +76,24 @@ $manifestObj = @(
 $manifestJson = $manifestObj | ConvertTo-Json -Depth 6
 $manifestOut = if ($ManifestPath) { Resolve-PathStrict $ManifestPath } else { Join-Path $outDir 'manifest.json' }
 Write-Host "Writing manifest: $manifestOut"
-$manifestJson | Out-File -FilePath $manifestOut -Encoding UTF8 -Force
+<#
+  Ensure top-level JSON array on disk regardless of PowerShell quirks
+#>
+$manifestArray = @()
+$manifestArray += $manifestObj[0]
+($manifestArray | ConvertTo-Json -Depth 6) | Out-File -FilePath $manifestOut -Encoding UTF8 -Force
+
+# Optionally push current branch (independent of release)
+if ($Push) {
+  Push-Location $repoRoot
+  try {
+    Write-Host "Pushing current branch commits"
+    try { git add -A | Out-Null } catch {}
+    try { git commit -m "Release $Version" | Out-Host } catch {}
+    git push | Out-Host
+  }
+  finally { Pop-Location }
+}
 
 if ($PublishRelease) {
   if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
@@ -84,20 +101,21 @@ if ($PublishRelease) {
   }
   Push-Location $repoRoot
   try {
-    if ($Push) {
-      Write-Host "Pushing current branch commits"
-      git push | Out-Host
-    }
     Write-Host "Tagging: $tag"
     git tag $tag -m "Release $Version"
     git push origin $tag
 
     Write-Host "Creating GitHub release and uploading asset"
-    gh release create $tag `
-      "$assetPath" `
-      --title "JellyBelly $Version" `
-      --notes "$Changelog" `
-      -R "$Owner/$Repo" | Out-Host
+    try {
+      gh release create $tag `
+        "$assetPath" `
+        --title "JellyBelly $Version" `
+        --notes "$Changelog" `
+        -R "$Owner/$Repo" | Out-Host
+    } catch {
+      Write-Host "Release may already exist. Uploading asset to existing release..."
+      gh release upload $tag "$assetPath" -R "$Owner/$Repo" --clobber | Out-Host
+    }
   }
   finally {
     Pop-Location
@@ -180,5 +198,6 @@ Write-Host "Asset: $assetPath"
 Write-Host "Checksum (MD5): $checksum"
 Write-Host "Manifest: $manifestOut"
 Write-Host "Source URL: $sourceUrl"
+Write-Host ("Manifest RAW URL: https://raw.githubusercontent.com/{0}/{1}/{2}/{3}" -f $ManifestRepoOwner, $ManifestRepo, $ManifestRepoBranch, $ManifestRepoPath)
 
 
