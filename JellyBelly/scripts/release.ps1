@@ -126,6 +126,11 @@ if ($UpdateManifestRepo) {
   if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     throw 'GitHub CLI (gh) is required to update the manifest repo. Install from https://cli.github.com/ and run gh auth login.'
   }
+  # Auto-detect default branch if reachable
+  try {
+    $detected = gh repo view "$ManifestRepoOwner/$ManifestRepo" --json defaultBranchRef -q .defaultBranchRef.name 2>$null
+    if ($detected -and $detected.Trim().Length -gt 0) { $ManifestRepoBranch = $detected.Trim() }
+  } catch { }
   Write-Host "Updating remote manifest repository: $ManifestRepoOwner/$ManifestRepo@$ManifestRepoBranch/$ManifestRepoPath"
   # Fetch current file to get sha
   $getCmd = "repos/$ManifestRepoOwner/$ManifestRepo/contents/$ManifestRepoPath?ref=$ManifestRepoBranch"
@@ -139,6 +144,23 @@ if ($UpdateManifestRepo) {
     $apiSucceeded = $false
     $current = $null
     $doc = $null
+  }
+  # If initial GET failed, try alternate common branch name once
+  if (-not $apiSucceeded) {
+    $altBranch = if ($ManifestRepoBranch -eq 'master') { 'main' } else { 'master' }
+    try {
+      Write-Host "Retrying GET using branch '$altBranch'"
+      $current = gh api "repos/$ManifestRepoOwner/$ManifestRepo/contents/$ManifestRepoPath?ref=$altBranch" --jq '{sha: .sha, content: .content, encoding: .encoding}' | ConvertFrom-Json
+      $existingJson = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(($current.content -replace "\n", "")))
+      $doc = $null
+      try { $doc = $existingJson | ConvertFrom-Json } catch { $doc = $null }
+      $ManifestRepoBranch = $altBranch
+      $apiSucceeded = $true
+    } catch {
+      $apiSucceeded = $false
+      $current = $null
+      $doc = $null
+    }
   }
 
   $newEntry = $manifestObj[0]
@@ -200,7 +222,20 @@ if ($UpdateManifestRepo) {
   if (-not $apiSucceeded) {
     Write-Host "API update failed; falling back to git clone workflow"
     $tmp = Join-Path $env:TEMP ("manifest_" + [System.Guid]::NewGuid().ToString('N'))
-    gh repo clone "$ManifestRepoOwner/$ManifestRepo" "$tmp" -- -b "$ManifestRepoBranch" | Out-Host
+    # Try clone with detected branch; if it fails, try alternate branch
+    $cloned = $false
+    try {
+      gh repo clone "$ManifestRepoOwner/$ManifestRepo" "$tmp" -- -b "$ManifestRepoBranch" | Out-Host
+      $cloned = $true
+    } catch {
+      $altBranch = if ($ManifestRepoBranch -eq 'master') { 'main' } else { 'master' }
+      try {
+        gh repo clone "$ManifestRepoOwner/$ManifestRepo" "$tmp" -- -b "$altBranch" | Out-Host
+        $ManifestRepoBranch = $altBranch
+        $cloned = $true
+      } catch { $cloned = $false }
+    }
+    if (-not $cloned) { throw "Failed to clone $ManifestRepoOwner/$ManifestRepo on master/main" }
     $mfPath = Join-Path $tmp $ManifestRepoPath
     New-Item -ItemType Directory -Path (Split-Path -Parent $mfPath) -Force | Out-Null
     $merged = $null
