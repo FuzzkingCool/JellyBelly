@@ -337,7 +337,10 @@ public sealed class CollectionsWriter
         if (imagePaths.Count == 0) return;
 
         // Determine output path under plugin data folder for stable caching
-        var dataDir = Path.Combine(AppContext.BaseDirectory ?? ".", "plugins-data", "JellyBelly", "covers");
+        // Use the server's configured plugins data path for write access
+        var pluginData = Plugin.Instance?.DataFolderPath
+            ?? Path.Combine(AppContext.BaseDirectory ?? ".", "plugins");
+        var dataDir = Path.Combine(pluginData, "JellyBelly", "covers");
         Directory.CreateDirectory(dataDir);
         var outPath = Path.Combine(dataDir, collection.Id.ToString("N") + ".png");
 
@@ -346,7 +349,17 @@ public sealed class CollectionsWriter
         var candidate = Path.Combine(AppContext.BaseDirectory ?? ".", "wwwroot", "jellybelly-overlay.png");
         if (File.Exists(candidate)) overlay = candidate;
 
-        ImageMosaic.Build2x3PosterWithOverlay(imagePaths, overlay, outPath);
+        try
+        {
+            ImageMosaic.Build2x3PosterWithOverlay(imagePaths, overlay, outPath);
+        }
+        catch (Exception ex)
+        {
+            // Log the error but continue - we don't want to break collection creation
+            // The mosaic cover is optional
+            System.Diagnostics.Debug.WriteLine($"Failed to create mosaic cover for collection {collection.Name}: {ex.Message}");
+            return;
+        }
 
         // Set as collection primary if not already set or if different path
         try

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using Jellyfin.Plugin.JellyBelly.Configuration;
 using MediaBrowser.Common.Configuration;
@@ -50,7 +51,35 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             Name = "jellybelly-overlay.png",
             EmbeddedResourcePath = _assembly.GetName().Name + ".wwwroot.jellybelly-overlay.png"
         };
+        yield return new PluginPageInfo
+        {
+            // Serve thumbnail image for plugin display
+            Name = "thumb.png",
+            EmbeddedResourcePath = _assembly.GetName().Name + ".wwwroot.jellybelly-card.png"
+        };
     }
+
+    /// <summary>
+    /// Gets the plugin's thumbnail image stream for display in the Jellyfin interface.
+    /// </summary>
+    /// <returns>A stream containing the plugin's thumbnail image.</returns>
+    public Stream GetThumbImage()
+    {
+        // Prefer embedded resource; fallback to copied wwwroot file.
+        var resName = _assembly.GetName().Name + ".wwwroot.jellybelly-card.png";
+        var stream = _assembly.GetManifestResourceStream(resName);
+        if (stream != null) return stream;
+
+        var onDisk = Path.Combine(base.ApplicationPaths?.PluginsPath ?? AppContext.BaseDirectory ?? ".", "Jellyfin.Plugin.JellyBelly", "wwwroot", "jellybelly-card.png");
+        if (File.Exists(onDisk)) return File.OpenRead(onDisk);
+        // As a last resort, return an empty stream to avoid 404
+        return new MemoryStream();
+    }
+
+    /// <summary>
+    /// Gets the format of the thumbnail image.
+    /// </summary>
+    public string ThumbImageFormat => "png";
 }
 
 

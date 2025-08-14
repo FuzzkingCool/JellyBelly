@@ -5,7 +5,6 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
     <WarningsAsMessages>CS1591</WarningsAsMessages>
-    <JellyfinVersion>10.9.0</JellyfinVersion>
     <NoWarn>$(NoWarn);NU1900</NoWarn>
   </PropertyGroup>
 </Project>

@@ -6,23 +6,25 @@
     <AssemblyName>Jellyfin.Plugin.JellyBelly</AssemblyName>
     <RootNamespace>Jellyfin.Plugin.JellyBelly</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Version>0.3.55</Version>
-    <AssemblyVersion>0.3.55.0</AssemblyVersion>
-    <FileVersion>0.3.55.0</FileVersion>
-    <InformationalVersion>0.3.55</InformationalVersion>
+    <Version>0.3.60</Version>
+    <AssemblyVersion>0.3.60.0</AssemblyVersion>
+    <FileVersion>0.3.60.0</FileVersion>
+    <InformationalVersion>0.3.60</InformationalVersion>
     <Authors>JellyBelly</Authors>
     <PackageId>Jellyfin.Plugin.JellyBelly</PackageId>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <LangVersion>latest</LangVersion>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Jellyfin.Common" Version="$(JellyfinVersion)" />
-    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)" />
-    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinVersion)" />
-    <PackageReference Include="Jellyfin.Data" Version="$(JellyfinVersion)" />
-    <PackageReference Include="System.Drawing.Common" Version="8.0.6" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.1" />
+    <PackageReference Include="Jellyfin.Controller" Version="10.10.0" />
+    <PackageReference Include="Jellyfin.Model" Version="10.10.0" />
+    <PackageReference Include="Jellyfin.Data" Version="10.10.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.6" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
   </ItemGroup>
 
   <ItemGroup>
@@ -34,8 +36,20 @@
       <LogicalName>Jellyfin.Plugin.JellyBelly.Configuration.PluginConfigurationPage.html</LogicalName>
     </EmbeddedResource>
     <Content Include="wwwroot/**" CopyToOutputDirectory="Always" />
+    <Content Include="wwwroot/jellybelly-card.png" CopyToOutputDirectory="Always" />
+    <EmbeddedResource Include="wwwroot/jellybelly-card.png">
+      <LogicalName>Jellyfin.Plugin.JellyBelly.wwwroot.jellybelly-card.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="wwwroot/jellybelly-overlay.png">
+      <LogicalName>Jellyfin.Plugin.JellyBelly.wwwroot.jellybelly-overlay.png</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 </Project>
+
+
+
+
+
 
 
 
