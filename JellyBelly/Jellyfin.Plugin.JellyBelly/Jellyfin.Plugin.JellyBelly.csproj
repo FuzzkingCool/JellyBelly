@@ -26,9 +26,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Configuration/PluginConfigurationPage.html">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
+    <EmbeddedResource Include="Configuration/PluginConfigurationPage.html" />
     <Content Include="wwwroot/**" CopyToOutputDirectory="Always" />
   </ItemGroup>
 </Project>
