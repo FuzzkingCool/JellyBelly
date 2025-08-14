@@ -171,34 +171,8 @@ if ($UpdateManifestRepo) {
     New-Item -ItemType Directory -Path (Split-Path -Parent $mfPath) -Force | Out-Null
     $newEntry = $manifestObj[0]
     $manifestArrayText = ($manifestArray | ConvertTo-Json -Depth 6)
-    if (Test-Path $mfPath) {
-      try {
-        $txt = Get-Content $mfPath -Raw -ErrorAction Stop
-        $existing = $txt | ConvertFrom-Json -ErrorAction Stop
-        if ($existing -is [System.Array]) { $arr = @(); $arr += $existing } else { $arr = @($existing) }
-        $found = $false
-        for ($i = 0; $i -lt $arr.Count; $i++) {
-          if ($arr[$i].guid -eq $newEntry.guid) {
-            $found = $true
-            $versions = @(); $versions += $newEntry.versions[0]
-            if ($arr[$i].versions) { $versions += $arr[$i].versions }
-            $arr[$i].versions = $versions
-            $arr[$i].name = $newEntry.name
-            $arr[$i].description = $newEntry.description
-            $arr[$i].overview = $newEntry.overview
-            $arr[$i].owner = $newEntry.owner
-            $arr[$i].category = $newEntry.category
-            break
-          }
-        }
-        if (-not $found) { $arr += $newEntry }
-        ($arr | ConvertTo-Json -Depth 6) | Out-File -FilePath $mfPath -Encoding UTF8 -Force
-      } catch {
-        $manifestArrayText | Out-File -FilePath $mfPath -Encoding UTF8 -Force
-      }
-    } else {
-      $manifestArrayText | Out-File -FilePath $mfPath -Encoding UTF8 -Force
-    }
+    # Always overwrite with a valid top-level array to avoid bad shapes lingering
+    $manifestArrayText | Out-File -FilePath $mfPath -Encoding UTF8 -Force
     git add "$ManifestRepoPath" | Out-Null
     git commit -m "Update manifest for JellyBelly $Version" | Out-Host
     git push origin "$ManifestRepoBranch" | Out-Host
