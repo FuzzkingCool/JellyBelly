@@ -2,11 +2,11 @@ param(
   [Parameter(Mandatory = $true)][string]$Version,
   [string]$Owner = 'FuzzkingCool',
   [string]$Repo = 'JellyBelly',
-  [string]$TargetAbi = '10.9.0.0',
+  [string]$TargetAbi = '10.10.0.0',
   [string]$Changelog = 'Release',
-  [switch]$UseVTag,
+  [switch]$UseVTag = $true,
   [switch]$PublishRelease = $true,
-  [switch]$Push = $true,
+  [switch]$Push = $false,
   [string]$TargetFramework = 'net8.0',
   [string]$OutputDir = 'dist',
   [string]$ManifestPath,
@@ -87,7 +87,28 @@ Write-Host "Computing MD5 checksum"
 $checksum = (Get-FileHash $assetPath -Algorithm MD5).Hash
 
 $tag = if ($UseVTag) { "v$Version" } else { $Version }
-$sourceUrl = "https://github.com/$Owner/$Repo/releases/download/$tag/$assetName"
+$releaseUrl = "https://github.com/$Owner/$Repo/releases/download/$tag/$assetName"
+
+# Always compute both release and raw URLs; prefer release if publishing, else raw
+$branch = $null
+try {
+  $branch = (git rev-parse --abbrev-ref HEAD 2>$null).Trim()
+} catch { $branch = $null }
+
+$rawUrl = $null
+if ($branch -and $OutputDir) {
+  $rawUrl = "https://raw.githubusercontent.com/$Owner/$Repo/$branch/$OutputDir/$assetName"
+}
+
+# Compute public image URL for the plugin card hosted in the repo
+$imageUrl = $null
+try {
+  $ref = if ($branch) { $branch } else { 'master' }
+  $imageUrl = "https://raw.githubusercontent.com/$Owner/$Repo/$ref/JellyBelly/Jellyfin.Plugin.JellyBelly/wwwroot/jellybelly-card.png"
+} catch { $imageUrl = $null }
+
+# Decide sourceUrl and keep dist/manifest.json in sync with the same URL as the external manifest
+$sourceUrl = if ($PublishRelease -and $releaseUrl) { $releaseUrl } elseif ($rawUrl) { $rawUrl } else { $releaseUrl }
 
 $manifestObj = @(
   [ordered]@{
@@ -97,6 +118,7 @@ $manifestObj = @(
     overview = 'Generates all-local Netflix-style recommendations per user using TF-IDF and optional ML.NET'
     owner = $Owner
     category = 'General'
+    imageUrl = $imageUrl
     versions = @(
       [ordered]@{
         version = $Version
@@ -119,6 +141,20 @@ Write-Host "Writing manifest: $manifestOut"
 # Always write as array from source object
 $manifestJson | Out-File -FilePath $manifestOut -Encoding UTF8 -Force
 
+# Ensure dist artifacts are always pushed so the raw manifest stays current
+if ($rawUrl) {
+  Push-Location $repoRoot
+  try {
+    $relManifest = $manifestOut
+    if ($manifestOut.ToLower().StartsWith($repoRoot.ToLower())) {
+      $relManifest = $manifestOut.Substring($repoRoot.Length).TrimStart([char]0x5C, [char]0x2F)
+    }
+    git add "$OutputDir/$assetName" "$relManifest" | Out-Null
+    try { git commit -m "Release $Version (dist)" | Out-Host } catch {}
+    try { git push | Out-Host } catch { Write-Warning "Could not push dist files: $($_.Exception.Message)" }
+  } finally { Pop-Location }
+}
+
 # Optionally push current branch (independent of release)
 if ($Push) {
   Push-Location $repoRoot
@@ -133,8 +169,12 @@ if ($Push) {
 
 if ($PublishRelease) {
   if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-    throw 'GitHub CLI (gh) is required for publishing. Install from https://cli.github.com/ and run gh auth login.'
+    Write-Warning 'GitHub CLI (gh) not found. Skipping release publish. Install https://cli.github.com/ and run gh auth login to enable publishing.'
+    $PublishRelease = $false
   }
+}
+
+if ($PublishRelease) {
   Push-Location $repoRoot
   try {
     Write-Host "Tagging: $tag"
@@ -152,6 +192,23 @@ if ($PublishRelease) {
       Write-Host "Release may already exist. Uploading asset to existing release..."
       gh release upload $tag "$assetPath" -R "$Owner/$Repo" --clobber | Out-Host
     }
+
+    # Recompute checksum from the uploaded asset to guarantee manifest matches the downloadable file
+    try {
+      $tmpAsset = Join-Path $env:TEMP ("jb_asset_" + [System.Guid]::NewGuid().ToString('N') + ".zip")
+      Invoke-WebRequest -UseBasicParsing -Uri $releaseUrl -OutFile $tmpAsset -Headers @{ 'Cache-Control' = 'no-cache' }
+      if (Test-Path $tmpAsset) {
+        $checksum = (Get-FileHash $tmpAsset -Algorithm MD5).Hash
+        # Update manifest objects and local manifest file to keep them in sync
+        $manifestObj[0].versions[0].checksum = $checksum
+        $manifestObj[0].versions[0].sourceUrl = $releaseUrl
+        $manifestJson = ConvertTo-Json -InputObject $manifestObj -Depth 6
+        $manifestJson | Out-File -FilePath $manifestOut -Encoding UTF8 -Force
+        Remove-Item $tmpAsset -Force
+      }
+    } catch {
+      Write-Warning "Could not fetch uploaded asset to recompute checksum: $($_.Exception.Message)"
+    }
   }
   finally {
     Pop-Location
@@ -160,8 +217,12 @@ if ($PublishRelease) {
 
 if ($UpdateManifestRepo) {
   if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-    throw 'GitHub CLI (gh) is required to update the manifest repo. Install from https://cli.github.com/ and run gh auth login.'
+    Write-Warning 'GitHub CLI (gh) not found. Skipping manifest repo update. Install https://cli.github.com/ and run gh auth login to enable manifest updates.'
+    $UpdateManifestRepo = $false
   }
+}
+
+if ($UpdateManifestRepo) {
   # Ensure manifest repo exists; create if missing
   $repoExists = $true
   try { gh repo view "$ManifestRepoOwner/$ManifestRepo" 1>$null 2>$null } catch { $repoExists = $false }
@@ -224,31 +285,70 @@ Write-Host ("Manifest RAW URL: https://raw.githubusercontent.com/{0}/{1}/{2}/{3}
 
 
 
-# Verify remote manifest and asset reachability to catch common Jellyfin repo issues
+# Verify remote manifests and asset reachability (robust parsing with BOM/whitespace handling)
+function Parse-JsonArrayStrict([string]$jsonText) {
+  if (-not $jsonText) { return $null }
+  $clean = $jsonText.TrimStart([char]0xFEFF).Trim()
+  if ($clean.StartsWith('{')) { $clean = '[' + $clean + ']' }
+  try { return ($clean | ConvertFrom-Json -ErrorAction Stop) } catch { return $null }
+}
+
 try {
   $manifestRawUrl = "https://raw.githubusercontent.com/$ManifestRepoOwner/$ManifestRepo/$ManifestRepoBranch/$ManifestRepoPath"
-  Write-Host "Verifying manifest JSON at: $manifestRawUrl"
-  $resp = Invoke-WebRequest -UseBasicParsing -Uri $manifestRawUrl -Headers @{ 'Cache-Control' = 'no-cache' }
-  $raw = $resp.Content
+  Write-Host "Verifying external manifest JSON at: $manifestRawUrl"
   $parsed = $null
-  try { $parsed = $raw | ConvertFrom-Json -ErrorAction Stop } catch { $parsed = $null }
+  try {
+    $parsed = Invoke-RestMethod -Uri $manifestRawUrl -Headers @{ 'Cache-Control' = 'no-cache' }
+  } catch {
+    # Fallback to web request + manual parse
+    $resp = Invoke-WebRequest -UseBasicParsing -Uri $manifestRawUrl -Headers @{ 'Cache-Control' = 'no-cache' }
+    $parsed = Parse-JsonArrayStrict $resp.Content
+  }
+  if ($parsed -ne $null -and -not ($parsed -is [System.Array])) { $parsed = @($parsed) }
   if ($parsed -eq $null -or -not ($parsed -is [System.Array])) {
-    Write-Warning "Manifest is not a JSON array or could not be parsed. Ensure it starts with [ and is accessible as RAW content."
+    Write-Warning "External manifest could not be parsed as an array. Check RAW URL caching or availability."
   } else {
     $first = $parsed[0]
     if ($first -and $first.versions -and $first.versions.Count -gt 0) {
       $src = $first.versions[0].sourceUrl
       if ($src) {
         Write-Host "Verifying release asset at: $src"
-        try {
-          Invoke-WebRequest -UseBasicParsing -Method Head -Uri $src | Out-Null
-        } catch {
-          Write-Warning "Release asset not reachable (404). Upload ZIP to the release or fix sourceUrl."
+        try { Invoke-WebRequest -UseBasicParsing -Method Head -Uri $src | Out-Null } catch { Write-Warning "Release asset not reachable (404)." }
+      }
+    }
+  }
+} catch { Write-Warning "External manifest fetch error: $($_.Exception.Message)" }
+
+try {
+  if ($branch -and $OutputDir) {
+    $distManifestUrl = "https://raw.githubusercontent.com/$Owner/$Repo/$branch/$OutputDir/manifest.json"
+    Write-Host "Verifying dist manifest JSON at: $distManifestUrl"
+    $parsed2 = $null
+    try {
+      $parsed2 = Invoke-RestMethod -Uri $distManifestUrl -Headers @{ 'Cache-Control' = 'no-cache' }
+    } catch {
+      $resp2 = Invoke-WebRequest -UseBasicParsing -Uri $distManifestUrl -Headers @{ 'Cache-Control' = 'no-cache' }
+      $parsed2 = Parse-JsonArrayStrict $resp2.Content
+    }
+    if ($parsed2 -ne $null -and -not ($parsed2 -is [System.Array])) { $parsed2 = @($parsed2) }
+    if ($parsed2 -eq $null -or -not ($parsed2 -is [System.Array])) {
+      Write-Warning "Dist manifest could not be parsed as an array."
+    } else {
+      $v1 = $null
+      if ($parsed -ne $null -and ($parsed -is [System.Array]) -and $parsed.Count -gt 0 -and $parsed[0] -ne $null -and $parsed[0].versions -ne $null -and $parsed[0].versions.Count -gt 0) {
+        $v1 = $parsed[0].versions[0]
+      }
+      $v2 = $null
+      if ($parsed2 -ne $null -and ($parsed2 -is [System.Array]) -and $parsed2.Count -gt 0 -and $parsed2[0] -ne $null -and $parsed2[0].versions -ne $null -and $parsed2[0].versions.Count -gt 0) {
+        $v2 = $parsed2[0].versions[0]
+      }
+      if ($v1 -ne $null -and $v2 -ne $null) {
+        if ($v1.version -ne $v2.version -or $v1.checksum -ne $v2.checksum -or $v1.sourceUrl -ne $v2.sourceUrl) {
+          Write-Warning "External and dist manifests differ (version/checksum/sourceUrl)."
         }
       }
     }
   }
-} catch {
-  Write-Warning "Could not fetch/parse remote manifest RAW URL. Ensure you're using the RAW URL (not refs/heads or blob)."
-}
+} catch { Write-Warning "Dist manifest fetch error: $($_.Exception.Message)" }
+
 

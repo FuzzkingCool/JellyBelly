@@ -75,7 +75,7 @@ public sealed class RecsScheduledTask : IScheduledTask
     /// Returns the default schedule on which the task runs.
     /// </summary>
     /// <returns>The default triggers.</returns>
-    public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
+        public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
     {
         // Nightly at 04:00
         yield return new TaskTriggerInfo
@@ -83,6 +83,14 @@ public sealed class RecsScheduledTask : IScheduledTask
             Type = TaskTriggerInfo.TriggerDaily,
             TimeOfDayTicks = TimeSpan.FromHours(4).Ticks
         };
+            // Conditionally run once at server startup (useful during development / debugging)
+            if ((_config?.DebugRunAtStartup) == true)
+            {
+                yield return new TaskTriggerInfo
+                {
+                    Type = TaskTriggerInfo.TriggerStartup
+                };
+            }
     }
 
     /// <summary>

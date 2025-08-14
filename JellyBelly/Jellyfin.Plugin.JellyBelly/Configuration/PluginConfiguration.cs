@@ -80,6 +80,11 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets a value indicating whether to run in dry-run mode (no writes).
     /// </summary>
     public bool DryRun { get; set; } = false;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to run the recommendations task at server startup (for debugging).
+        /// </summary>
+        public bool DebugRunAtStartup { get; set; } = true;
 }
 
 
