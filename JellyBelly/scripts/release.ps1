@@ -5,13 +5,13 @@ param(
   [string]$TargetAbi = '10.9.0.0',
   [string]$Changelog = 'Release',
   [switch]$UseVTag,
-  [switch]$PublishRelease,
-  [switch]$Push,
+  [switch]$PublishRelease = $true,
+  [switch]$Push = $true,
   [string]$TargetFramework = 'net8.0',
   [string]$OutputDir = 'dist',
   [string]$ManifestPath,
   # Remote manifest repo update options
-  [switch]$UpdateManifestRepo,
+  [switch]$UpdateManifestRepo = $true,
   [string]$ManifestRepoOwner = 'FuzzkingCool',
   [string]$ManifestRepo = 'JellyfinPluginManifest',
   [string]$ManifestRepoBranch = 'master',
@@ -111,7 +111,7 @@ if ($PublishRelease) {
         "$assetPath" `
         --title "JellyBelly $Version" `
         --notes "$Changelog" `
-        -R "$Owner/$Repo" | Out-Host
+        -R "$Owner/$Repo" --verify-tag | Out-Host
     } catch {
       Write-Host "Release may already exist. Uploading asset to existing release..."
       gh release upload $tag "$assetPath" -R "$Owner/$Repo" --clobber | Out-Host
