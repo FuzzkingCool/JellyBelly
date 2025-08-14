@@ -85,6 +85,11 @@ public class PluginConfiguration : BasePluginConfiguration
         /// Gets or sets a value indicating whether to run the recommendations task at server startup (for debugging).
         /// </summary>
         public bool DebugRunAtStartup { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to generate 2x3 mosaic covers with overlay for created collections.
+        /// </summary>
+        public bool GenerateMosaicCovers { get; set; } = true;
 }
 
 

@@ -11,6 +11,8 @@ using Jellyfin.Data.Enums;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using System.IO;
+using System.Linq;
 
 namespace Jellyfin.Plugin.JellyBelly.Output;
 
@@ -77,6 +79,8 @@ public sealed class CollectionsWriter
         var collection = EnsureCollection(user, name);
         var items = itemIds.Select(id => _library.GetItemById(id)).Where(i => i != null).Cast<BaseItem>().ToList();
         AddItemsToCollection(collection, items);
+        TrySetMosaicCover(collection, items);
+        TryBumpDates(collection);
     }
 
         /// <summary>
@@ -92,6 +96,8 @@ public sealed class CollectionsWriter
         var playlist = EnsureCollection(user, name);
         var items = itemIds.Select(id => _library.GetItemById(id)).Where(i => i != null).Cast<BaseItem>().ToList();
         AddItemsToCollection(playlist, items);
+        TrySetMosaicCover(playlist, items);
+        TryBumpDates(playlist);
     }
 
     private BaseItem EnsureCollection(UserRef user, string name)
@@ -311,6 +317,83 @@ public sealed class CollectionsWriter
             .Select(mi => mi.Name + "(" + string.Join(", ", mi.GetParameters().Select(p => p.ParameterType.Name)) + ")")
             .ToArray();
         throw new MissingMethodException("ICollectionManager AddToCollection method not found. Available overloads: " + string.Join("; ", sigs));
+    }
+
+    private void TrySetMosaicCover(BaseItem collection, List<BaseItem> items)
+    {
+        // Respect config toggle
+        try { if (Plugin.Instance?.Configuration?.GenerateMosaicCovers == false) return; } catch { }
+
+        // Collect primary images of first 6 items
+        var imagePaths = items
+            .Where(i => i != null)
+            .SelectMany(i => i.ImageInfos ?? Array.Empty<ItemImageInfo>())
+            .Where(ii => ii.Type == ImageType.Primary && !string.IsNullOrEmpty(ii.Path))
+            .Select(ii => ii.Path!)
+            .Distinct()
+            .Take(6)
+            .ToList();
+
+        if (imagePaths.Count == 0) return;
+
+        // Determine output path under plugin data folder for stable caching
+        var dataDir = Path.Combine(AppContext.BaseDirectory ?? ".", "plugins-data", "JellyBelly", "covers");
+        Directory.CreateDirectory(dataDir);
+        var outPath = Path.Combine(dataDir, collection.Id.ToString("N") + ".png");
+
+        // Overlay from wwwroot (copied to output)
+        string? overlay = null;
+        var candidate = Path.Combine(AppContext.BaseDirectory ?? ".", "wwwroot", "jellybelly-overlay.png");
+        if (File.Exists(candidate)) overlay = candidate;
+
+        ImageMosaic.Build2x3PosterWithOverlay(imagePaths, overlay, outPath);
+
+        // Set as collection primary if not already set or if different path
+        try
+        {
+            var type = collection.GetType();
+            var setImage = type.GetMethod("SetImagePath", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (setImage != null)
+            {
+                var imageTypeEnum = typeof(ImageType);
+                setImage.Invoke(collection, new object?[] { imageTypeEnum.GetField("Primary")?.GetValue(null) ?? ImageType.Primary, outPath });
+                return;
+            }
+
+            // Fallback to Images collection (older Jellyfin)
+            var imagesProp = type.GetProperty("ImageInfos", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var list = imagesProp?.GetValue(collection) as IList<ItemImageInfo>;
+            if (list != null)
+            {
+                var existing = list.FirstOrDefault(i => i.Type == ImageType.Primary);
+                if (existing == null)
+                {
+                    list.Add(new ItemImageInfo { Path = outPath, Type = ImageType.Primary });
+                }
+                else
+                {
+                    existing.Path = outPath;
+                }
+            }
+        }
+        catch
+        {
+            // If setting image fails, skip silently; we don't want to break collection creation.
+        }
+    }
+
+    private void TryBumpDates(BaseItem collection)
+    {
+        try
+        {
+            var t = collection.GetType();
+            var now = DateTime.UtcNow;
+            var dc = t.GetProperty("DateCreated", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (dc != null && dc.CanWrite) dc.SetValue(collection, now);
+            var dm = t.GetProperty("DateModified", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (dm != null && dm.CanWrite) dm.SetValue(collection, now);
+        }
+        catch { }
     }
 }
 

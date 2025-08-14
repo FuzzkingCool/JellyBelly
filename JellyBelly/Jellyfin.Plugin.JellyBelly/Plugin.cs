@@ -44,6 +44,12 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             Name = "JellyBelly",
             EmbeddedResourcePath = _assembly.GetName().Name + ".Configuration.PluginConfigurationPage.html"
         };
+        yield return new PluginPageInfo
+        {
+            // Serve overlay for consumers that want a URL instead of embedding file path
+            Name = "jellybelly-overlay.png",
+            EmbeddedResourcePath = _assembly.GetName().Name + ".wwwroot.jellybelly-overlay.png"
+        };
     }
 }
 

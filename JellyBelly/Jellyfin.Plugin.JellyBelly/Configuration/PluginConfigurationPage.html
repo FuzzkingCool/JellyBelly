@@ -45,6 +45,7 @@
                 </div>
                 <div class="field"><label class="inputLabel" title="Enable TMDb enrichment with attribution. Disabled by default."><input id="jb_tmdb" type="checkbox" /> Enable TMDb enrichment</label></div>
                 <div class="field"><label class="inputLabel" title="Enable Wikidata enrichment. Disabled by default."><input id="jb_wikidata" type="checkbox" /> Enable Wikidata enrichment</label></div>
+                <div class="field"><label class="inputLabel" title="Generate 2x3 mosaic covers with overlay for created collections."><input id="jb_mosaic" type="checkbox" /> Generate mosaic covers with overlay</label></div>
                 <div class="field"><label class="inputLabel" title="Log results but do not write collections."><input id="jb_dryrun" type="checkbox" /> Dry run</label></div>
             </div>
 
@@ -65,7 +66,7 @@
 <script type="text/javascript">
     define(['jQuery', 'loading'], function ($, loading) {
         'use strict';
-        const defaults = {
+            const defaults = {
 			MaxItemsPerRow: 30,
 			RecentItemsToLearnFrom: 50,
 			HalfLifeDays: 30,
@@ -81,6 +82,7 @@
 			CfBlendWeight: 0.5,
 			EnableTmdbEnrichment: false,
 			EnableWikidataEnrichment: false,
+			GenerateMosaicCovers: true,
 			MinimumScoreThreshold: 0.05,
 			DryRun: false,
 			DebugRunAtStartup: true
@@ -111,6 +113,7 @@
             setNum(view, 'cfblend', v.CfBlendWeight);
             setBool(view, 'tmdb', v.EnableTmdbEnrichment);
             setBool(view, 'wikidata', v.EnableWikidataEnrichment);
+            setBool(view, 'mosaic', v.GenerateMosaicCovers);
             setNum(view, 'minscore', v.MinimumScoreThreshold);
             setBool(view, 'dryrun', v.DryRun);
             setBool(view, 'debugstartup', v.DebugRunAtStartup);
@@ -134,6 +137,7 @@
                 CfBlendWeight: getNum(view, 'cfblend'),
                 EnableTmdbEnrichment: getBool(view, 'tmdb'),
                 EnableWikidataEnrichment: getBool(view, 'wikidata'),
+                GenerateMosaicCovers: getBool(view, 'mosaic'),
                 MinimumScoreThreshold: getNum(view, 'minscore'),
                 DryRun: getBool(view, 'dryrun'),
                 DebugRunAtStartup: getBool(view, 'debugstartup')
