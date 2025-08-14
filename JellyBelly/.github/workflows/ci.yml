@@ -21,11 +21,11 @@ jobs:
       - name: Pack plugin artifact
         run: |
           mkdir -p artifact
-          cp -r JellyBelly/Jellyfin.Plugin.LocalRecs/bin/Release/net8.0/* artifact/
+          cp -r JellyBelly/Jellyfin.Plugin.JellyBelly/bin/Release/net8.0/* artifact/
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Jellyfin.Plugin.LocalRecs
+          name: Jellyfin.Plugin.JellyBelly
           path: artifact
 
 

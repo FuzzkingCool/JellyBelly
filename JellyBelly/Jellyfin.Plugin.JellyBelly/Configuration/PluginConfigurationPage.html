@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>JellyBelly Settings</title>
+    <style>
+        .section { margin: 1rem 0; }
+        .field { margin: 0.5rem 0; }
+        label { display:block; font-weight:600; }
+        input[type=number] { width: 120px; }
+    </style>
+    <script type="text/javascript">
+        function onLoad() {
+            const pageId = 'JellyBelly';
+            ApiClient.getPluginConfiguration(pageId).then(cfg => {
+                setValues(cfg);
+            });
+            document.getElementById('save').addEventListener('click', function () {
+                const cfg = getValues();
+                ApiClient.updatePluginConfiguration(pageId, cfg).then(() => Dashboard.processPluginConfigurationUpdateResult());
+            });
+            document.getElementById('cfenabled').addEventListener('change', function(){
+                document.getElementById('cfblend-wrap').style.display = this.checked ? 'block' : 'none';
+            });
+        }
+        function setValues(cfg) {
+            setNum('maxitems', cfg.MaxItemsPerRow);
+            setNum('recent', cfg.RecentItemsToLearnFrom);
+            setNum('halflife', cfg.HalfLifeDays);
+            setNum('w_finished', cfg.FinishedWeight);
+            setNum('w_partial', cfg.PartialOver40Weight);
+            setNum('w_fav', cfg.FavoriteOrLikeWeight);
+            setNum('w_rating', cfg.RatingWeight);
+            setBool('because', cfg.CreateBecauseRows);
+            setBool('toppicks', cfg.CreateTopPicksRow);
+            setBool('topics', cfg.CreateTopicCollections);
+            setBool('pbr', cfg.UsePlaybackReporting);
+            setBool('cfenabled', cfg.EnableCollaborativeFiltering);
+            setNum('cfblend', cfg.CfBlendWeight);
+            setBool('tmdb', cfg.EnableTmdbEnrichment);
+            setBool('wikidata', cfg.EnableWikidataEnrichment);
+            setNum('minscore', cfg.MinimumScoreThreshold);
+            setBool('dryrun', cfg.DryRun);
+            document.getElementById('cfblend-wrap').style.display = cfg.EnableCollaborativeFiltering ? 'block' : 'none';
+        }
+        function getValues(){
+            return {
+                MaxItemsPerRow: getNum('maxitems'),
+                RecentItemsToLearnFrom: getNum('recent'),
+                HalfLifeDays: getNum('halflife'),
+                FinishedWeight: getNum('w_finished'),
+                PartialOver40Weight: getNum('w_partial'),
+                FavoriteOrLikeWeight: getNum('w_fav'),
+                RatingWeight: getNum('w_rating'),
+                CreateBecauseRows: getBool('because'),
+                CreateTopPicksRow: getBool('toppicks'),
+                CreateTopicCollections: getBool('topics'),
+                UsePlaybackReporting: getBool('pbr'),
+                EnableCollaborativeFiltering: getBool('cfenabled'),
+                CfBlendWeight: getNum('cfblend'),
+                EnableTmdbEnrichment: getBool('tmdb'),
+                EnableWikidataEnrichment: getBool('wikidata'),
+                MinimumScoreThreshold: getNum('minscore'),
+                DryRun: getBool('dryrun')
+            };
+        }
+        function setNum(id, v){ document.getElementById(id).value = v; }
+        function setBool(id, v){ document.getElementById(id).checked = !!v; }
+        function getNum(id){ return parseFloat(document.getElementById(id).value); }
+        function getBool(id){ return !!document.getElementById(id).checked; }
+        document.addEventListener('DOMContentLoaded', onLoad);
+    </script>
+    <!-- No IMDb usage. Optional TMDb/Wikidata disabled by default. -->
+    <!-- Attribution: TMDb and Wikidata if enabled. -->
+    <!-- No em dashes in visible text. -->
+</head>
+<body>
+    <div class="section">
+        <h2>JellyBelly Settings</h2>
+        <div class="field">
+            <label for="maxitems" title="Maximum items per row in generated collections.">Max items per row</label>
+            <input id="maxitems" type="number" min="1" max="500" step="1" />
+        </div>
+        <div class="field">
+            <label for="recent" title="How many recent items to learn from when building your profile.">Recent items to learn from</label>
+            <input id="recent" type="number" min="1" max="1000" step="1" />
+        </div>
+        <div class="field">
+            <label for="halflife" title="Recency decay half life in days.">Half life (days)</label>
+            <input id="halflife" type="number" min="1" max="365" step="1" />
+        </div>
+    </div>
+    <div class="section">
+        <h3>Weights</h3>
+        <div class="field"><label for="w_finished" title="Weight for finished plays.">Finished weight</label><input id="w_finished" type="number" step="0.05" min="0" max="10" /></div>
+        <div class="field"><label for="w_partial" title="Weight for partial plays over 40 percent.">Partial over 40 percent weight</label><input id="w_partial" type="number" step="0.05" min="0" max="10" /></div>
+        <div class="field"><label for="w_fav" title="Weight for favorite or like.">Favorite or like weight</label><input id="w_fav" type="number" step="0.05" min="0" max="10" /></div>
+        <div class="field"><label for="w_rating" title="Weight for rating normalized 0 to 1.">Rating weight</label><input id="w_rating" type="number" step="0.05" min="0" max="10" /></div>
+    </div>
+    <div class="section">
+        <h3>Toggles</h3>
+        <div class="field"><label title="Create Because you watched rows."><input id="because" type="checkbox" /> Create Because you watched rows</label></div>
+        <div class="field"><label title="Create Top picks row."><input id="toppicks" type="checkbox" /> Create Top picks row</label></div>
+        <div class="field"><label title="Create topic collections from genres, tags, people, studios."><input id="topics" type="checkbox" /> Create topic collections</label></div>
+        <div class="field"><label title="Use Playback Reporting if installed."><input id="pbr" type="checkbox" /> Use Playback Reporting if installed</label></div>
+        <div class="field"><label title="Enable collaborative filtering with ML.NET."><input id="cfenabled" type="checkbox" /> Enable collaborative filtering (ML.NET)</label></div>
+        <div id="cfblend-wrap" class="field" style="display:none;">
+            <label for="cfblend" title="Blend weight of CF vs TF-IDF. 0 means TF-IDF only, 1 means CF only.">Blend weight for CF vs TF-IDF</label>
+            <input id="cfblend" type="number" min="0" max="1" step="0.05" />
+        </div>
+        <div class="field"><label title="Enable TMDb enrichment with attribution. Disabled by default."><input id="tmdb" type="checkbox" /> Enable TMDb enrichment</label></div>
+        <div class="field"><label title="Enable Wikidata enrichment. Disabled by default."><input id="wikidata" type="checkbox" /> Enable Wikidata enrichment</label></div>
+        <div class="field"><label title="Log results but do not write collections."><input id="dryrun" type="checkbox" /> Dry run</label></div>
+    </div>
+    <div class="section">
+        <div class="field">
+            <label for="minscore" title="Minimum score threshold for inclusion.">Minimum score threshold</label>
+            <input id="minscore" type="number" min="0" max="1" step="0.01" />
+        </div>
+    </div>
+    <div class="section">
+        <button id="save">Save</button>
+    </div>
+</body>
+</html>
+
+

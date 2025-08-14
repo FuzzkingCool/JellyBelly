@@ -4,9 +4,9 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "JellyBelly", "JellyBelly", "{D4A25EF1-C30E-C629-0E1C-356EB066662E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jellyfin.Plugin.LocalRecs", "JellyBelly\Jellyfin.Plugin.LocalRecs\Jellyfin.Plugin.LocalRecs.csproj", "{86C85473-A271-2AE8-F567-C82CD414EC39}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jellyfin.Plugin.JellyBelly", "JellyBelly\Jellyfin.Plugin.JellyBelly\Jellyfin.Plugin.JellyBelly.csproj", "{86C85473-A271-2AE8-F567-C82CD414EC39}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jellyfin.Plugin.LocalRecs.Tests", "JellyBelly\Jellyfin.Plugin.LocalRecs.Tests\Jellyfin.Plugin.LocalRecs.Tests.csproj", "{6587FF3F-F123-BFEB-043E-BC2F1C6CBECC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jellyfin.Plugin.JellyBelly.Tests", "JellyBelly\Jellyfin.Plugin.JellyBelly.Tests\Jellyfin.Plugin.JellyBelly.Tests.csproj", "{6587FF3F-F123-BFEB-043E-BC2F1C6CBECC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
