@@ -11,8 +11,8 @@
                          "changelog":  "Release",
                          "targetAbi":  "10.9.0.0",
                          "sourceUrl":  "https://github.com/FuzzkingCool/JellyBelly/releases/download/0.3.11/Jellyfin-Plugin-JellyBelly.zip",
-                         "checksum":  "0C563B7AA5E314815EA442072EA7FAB8",
-                         "timestamp":  "2025-08-14T02:28:18.8938393Z"
+                         "checksum":  "EF9762000C153E9A476BB7FDB119A8A3",
+                         "timestamp":  "2025-08-14T02:35:12.0318714Z"
                      }
                  ]
 }
