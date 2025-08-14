@@ -9,12 +9,12 @@
         "imageUrl":  "https://raw.githubusercontent.com/FuzzkingCool/JellyBelly/master/JellyBelly/Jellyfin.Plugin.JellyBelly/wwwroot/jellybelly-card.png",
         "versions":  [
                          {
-                             "version":  "0.3.56",
+                             "version":  "0.3.57",
                              "changelog":  "Release",
                              "targetAbi":  "10.10.0.0",
-                             "sourceUrl":  "https://github.com/FuzzkingCool/JellyBelly/releases/download/v0.3.56/Jellyfin-Plugin-JellyBelly.zip",
-                             "checksum":  "A08B70BB27A5A305970C2E3AA8F2B091",
-                             "timestamp":  "2025-08-14T18:05:21.6190310Z"
+                             "sourceUrl":  "https://github.com/FuzzkingCool/JellyBelly/releases/download/v0.3.57/Jellyfin-Plugin-JellyBelly.zip",
+                             "checksum":  "2D8A346AFB429FA0900EB3847FF59650",
+                             "timestamp":  "2025-08-14T21:45:45.5490597Z"
                          }
                      ]
     }
