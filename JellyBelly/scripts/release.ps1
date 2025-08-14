@@ -167,11 +167,15 @@ if ($UpdateManifestRepo) {
   if ($doc -eq $null) {
     # Create new file with our manifest content
     $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($manifestJson))
-    gh api "repos/$ManifestRepoOwner/$ManifestRepo/contents/$ManifestRepoPath" `
-      -X PUT `
-      -f message="Update manifest for JellyBelly $Version" `
-      -f branch="$ManifestRepoBranch" `
-      -f content="$b64" | Out-Host
+    try {
+      gh api "repos/$ManifestRepoOwner/$ManifestRepo/contents/$ManifestRepoPath" `
+        -X PUT `
+        -f message="Update manifest for JellyBelly $Version" `
+        -f branch="$ManifestRepoBranch" `
+        -f content="$b64" | Out-Host
+    } catch {
+      $apiSucceeded = $false
+    }
   } else {
     # Merge into existing top-level array
     if ($doc -is [System.Array]) {

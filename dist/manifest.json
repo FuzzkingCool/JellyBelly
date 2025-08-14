@@ -7,12 +7,12 @@
     "category":  "General",
     "versions":  [
                      {
-                         "version":  "0.2.6",
+                         "version":  "0.2.7",
                          "changelog":  "Release",
                          "targetAbi":  "10.9.0.0",
-                         "sourceUrl":  "https://github.com/FuzzkingCool/JellyBelly/releases/download/0.2.6/Jellyfin-Plugin-JellyBelly.zip",
-                         "checksum":  "C0E3B4A77ADD3533FF04B45900B1B658",
-                         "timestamp":  "2025-08-14T00:57:52.0929591Z"
+                         "sourceUrl":  "https://github.com/FuzzkingCool/JellyBelly/releases/download/0.2.7/Jellyfin-Plugin-JellyBelly.zip",
+                         "checksum":  "BE3D137DA2C63CDAE14B5BEC0D5E170C",
+                         "timestamp":  "2025-08-14T00:59:22.8104257Z"
                      }
                  ]
 }
