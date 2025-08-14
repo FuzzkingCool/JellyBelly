@@ -213,3 +213,32 @@ Write-Host "Source URL: $sourceUrl"
 Write-Host ("Manifest RAW URL: https://raw.githubusercontent.com/{0}/{1}/{2}/{3}" -f $ManifestRepoOwner, $ManifestRepo, $ManifestRepoBranch, $ManifestRepoPath)
 
 
+
+# Verify remote manifest and asset reachability to catch common Jellyfin repo issues
+try {
+  $manifestRawUrl = "https://raw.githubusercontent.com/$ManifestRepoOwner/$ManifestRepo/$ManifestRepoBranch/$ManifestRepoPath"
+  Write-Host "Verifying manifest JSON at: $manifestRawUrl"
+  $resp = Invoke-WebRequest -UseBasicParsing -Uri $manifestRawUrl -Headers @{ 'Cache-Control' = 'no-cache' }
+  $raw = $resp.Content
+  $parsed = $null
+  try { $parsed = $raw | ConvertFrom-Json -ErrorAction Stop } catch { $parsed = $null }
+  if ($parsed -eq $null -or -not ($parsed -is [System.Array])) {
+    Write-Warning "Manifest is not a JSON array or could not be parsed. Ensure it starts with [ and is accessible as RAW content."
+  } else {
+    $first = $parsed[0]
+    if ($first -and $first.versions -and $first.versions.Count -gt 0) {
+      $src = $first.versions[0].sourceUrl
+      if ($src) {
+        Write-Host "Verifying release asset at: $src"
+        try {
+          Invoke-WebRequest -UseBasicParsing -Method Head -Uri $src | Out-Null
+        } catch {
+          Write-Warning "Release asset not reachable (404). Upload ZIP to the release or fix sourceUrl."
+        }
+      }
+    }
+  }
+} catch {
+  Write-Warning "Could not fetch/parse remote manifest RAW URL. Ensure you're using the RAW URL (not refs/heads or blob)."
+}
+
