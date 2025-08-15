@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Jellyfin.Plugin.JellyBelly.Output;
 
@@ -76,10 +77,8 @@ public sealed class CollectionsWriter
         /// <param name="collections">The collection manager used to create and modify collections.</param>
         /// <param name="library">The library manager used to resolve items by identifier.</param>
     public CollectionsWriter(ICollectionManager collections, ILibraryManager library)
-    {
-        _collections = collections;
-        _library = library;
-    }
+        : this(collections, library, NullLogger.Instance)
+    { }
 
         /// <summary>
         /// Creates or updates a "Top picks" collection for a user with the provided items.
@@ -166,7 +165,7 @@ public sealed class CollectionsWriter
         var type = _collections.GetType();
 
         // Try any CreateCollection overloads, preferring options-based
-        var methods = type.GetMethods(BindingFlags.Instance | BindingFlags.Public)
+        var methods = type.GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
             .Where(m => string.Equals(m.Name, "CreateCollection", StringComparison.Ordinal)
                      || string.Equals(m.Name, "CreateCollectionAsync", StringComparison.Ordinal))
             .ToList();
@@ -253,7 +252,7 @@ public sealed class CollectionsWriter
         }
 
         // Build diagnostic message including available methods
-        var sigs = type.GetMethods(BindingFlags.Instance | BindingFlags.Public)
+        var sigs = type.GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
             .Where(m => m.Name.StartsWith("CreateCollection", StringComparison.Ordinal))
             .Select(m => m.Name + "(" + string.Join(", ", m.GetParameters().Select(p => p.ParameterType.Name)) + ")")
             .ToArray();
@@ -265,7 +264,7 @@ public sealed class CollectionsWriter
         var type = _collections.GetType();
 
         // Try AddOrRemoveFromCollection(collection, items, <enum>) without compile-time enum dependency
-        var addOrRemove = type.GetMethods(BindingFlags.Instance | BindingFlags.Public)
+        var addOrRemove = type.GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
             .FirstOrDefault(mi => mi.Name == "AddOrRemoveFromCollection" && mi.GetParameters().Length == 3);
         if (addOrRemove != null)
         {
@@ -285,12 +284,12 @@ public sealed class CollectionsWriter
         var itemIdStrings = itemIds.Select(g => g.ToString()).ToList();
 
         // Try any AddToCollection/AddToCollectionAsync overload with mappable parameters
-        var candidates = type.GetMethods(BindingFlags.Instance | BindingFlags.Public)
+        var candidates = type.GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
             .Where(mi => string.Equals(mi.Name, "AddToCollection", StringComparison.Ordinal)
                       || string.Equals(mi.Name, "AddToCollectionAsync", StringComparison.Ordinal))
             .ToList();
 
-        bool TryInvokeBatch(MethodInfo mi)
+        bool TryInvokeBatch(System.Reflection.MethodInfo mi)
         {
             var ps = mi.GetParameters();
             if (ps.Length < 2 || ps.Length > 3) return false;
@@ -323,7 +322,7 @@ public sealed class CollectionsWriter
         }
 
         // Fallback to adding one by one for any two-arg AddToCollection variant
-        bool TryInvokeSingle(MethodInfo mi)
+        bool TryInvokeSingle(System.Reflection.MethodInfo mi)
         {
             var ps = mi.GetParameters();
             if (ps.Length != 2) return false;
@@ -344,7 +343,7 @@ public sealed class CollectionsWriter
             return true;
         }
 
-        var singleCandidates = type.GetMethods(BindingFlags.Instance | BindingFlags.Public)
+        var singleCandidates = type.GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
             .Where(mi => (mi.Name == "AddToCollection" || mi.Name == "AddToCollectionAsync") && mi.GetParameters().Length == 2)
             .ToList();
         foreach (var mi in singleCandidates)
@@ -353,7 +352,7 @@ public sealed class CollectionsWriter
         }
 
         // Build diagnostics for available add methods
-        var sigs = type.GetMethods(BindingFlags.Instance | BindingFlags.Public)
+        var sigs = type.GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
             .Where(mi => mi.Name.StartsWith("Add", StringComparison.OrdinalIgnoreCase))
             .Select(mi => mi.Name + "(" + string.Join(", ", mi.GetParameters().Select(p => p.ParameterType.Name)) + ")")
             .ToArray();
@@ -406,7 +405,7 @@ public sealed class CollectionsWriter
         try
         {
             var type = collection.GetType();
-            var setImage = type.GetMethod("SetImagePath", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var setImage = type.GetMethod("SetImagePath", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
             if (setImage != null)
             {
                 var imageTypeEnum = typeof(ImageType);
@@ -415,7 +414,7 @@ public sealed class CollectionsWriter
             }
 
             // Fallback to Images collection (older Jellyfin)
-            var imagesProp = type.GetProperty("ImageInfos", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var imagesProp = type.GetProperty("ImageInfos", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
             var list = imagesProp?.GetValue(collection) as IList<ItemImageInfo>;
             if (list != null)
             {
@@ -442,9 +441,9 @@ public sealed class CollectionsWriter
         {
             var t = collection.GetType();
             var now = DateTime.UtcNow;
-            var dc = t.GetProperty("DateCreated", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var dc = t.GetProperty("DateCreated", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
             if (dc != null && dc.CanWrite) dc.SetValue(collection, now);
-            var dm = t.GetProperty("DateModified", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var dm = t.GetProperty("DateModified", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
             if (dm != null && dm.CanWrite) dm.SetValue(collection, now);
         }
         catch { }

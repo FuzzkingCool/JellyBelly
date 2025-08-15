@@ -1,11 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Drawing.Processing;
+using SkiaSharp;
 
 namespace Jellyfin.Plugin.JellyBelly.Output;
 
@@ -41,47 +37,61 @@ internal static class ImageMosaic
 		if (sourceImagePaths == null) throw new ArgumentNullException(nameof(sourceImagePaths));
 		Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
 
-        using var canvas = new Image<Rgba32>(canvasWidth, canvasHeight);
-        canvas.Mutate(ctx => ctx.BackgroundColor(Color.Black));
+		using var surface = SKSurface.Create(new SKImageInfo(canvasWidth, canvasHeight, SKColorType.Rgba8888, SKAlphaType.Premul));
+		var canvas = surface.Canvas;
+		canvas.Clear(SKColors.Black);
 
-        int cols = 2;
-        int rows = 3;
-        int cellW = canvasWidth / cols;
-        int cellH = canvasHeight / rows;
+		int cols = 2;
+		int rows = 3;
+		int cellW = canvasWidth / cols;
+		int cellH = canvasHeight / rows;
 
-        for (int idx = 0; idx < Math.Min(6, sourceImagePaths.Count); idx++)
-        {
-            string path = sourceImagePaths[idx];
-            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) continue;
-            using var src = Image.Load<Rgba32>(path);
-            var options = new ResizeOptions
-            {
-                Size = new Size(cellW, cellH),
-                Mode = ResizeMode.Crop,
-                Sampler = KnownResamplers.Bicubic,
-                Position = AnchorPositionMode.Center
-            };
-            using var resized = src.Clone(op => op.Resize(options));
-            int r = idx / cols;
-            int c = idx % cols;
-            int x = c * cellW;
-            int y = r * cellH;
-            canvas.Mutate(op => op.DrawImage(resized, new Point(x, y), 1f));
-        }
+		for (int idx = 0; idx < Math.Min(6, sourceImagePaths.Count); idx++)
+		{
+			string path = sourceImagePaths[idx];
+			if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) continue;
+			using var bitmap = SKBitmap.Decode(path);
+			if (bitmap == null) continue;
 
-        if (!string.IsNullOrEmpty(overlayPath) && File.Exists(overlayPath))
-        {
-            using var overlay = Image.Load<Rgba32>(overlayPath);
-            using var overlayScaled = overlay.Clone(op => op.Resize(new ResizeOptions
-            {
-                Size = new Size(canvasWidth, canvasHeight),
-                Mode = ResizeMode.Stretch
-            }));
-            canvas.Mutate(op => op.DrawImage(overlayScaled, new Point(0, 0), 1f));
-        }
+			float srcAspect = (float)bitmap.Width / bitmap.Height;
+			float dstAspect = (float)cellW / cellH;
+			SKRect srcRect;
+			if (srcAspect > dstAspect)
+			{
+				int newWidth = (int)(bitmap.Height * dstAspect);
+				int xOff = (bitmap.Width - newWidth) / 2;
+				srcRect = new SKRect(xOff, 0, xOff + newWidth, bitmap.Height);
+			}
+			else
+			{
+				int newHeight = (int)(bitmap.Width / dstAspect);
+				int yOff = (bitmap.Height - newHeight) / 2;
+				srcRect = new SKRect(0, yOff, bitmap.Width, yOff + newHeight);
+			}
 
-        var encoder = new PngEncoder { ColorType = PngColorType.RgbWithAlpha, CompressionLevel = PngCompressionLevel.Level6 };
-        canvas.Save(outputPath, encoder);
+			int r = idx / cols;
+			int c = idx % cols;
+			int x = c * cellW;
+			int y = r * cellH;
+			var dstRect = new SKRect(x, y, x + cellW, y + cellH);
+			canvas.DrawBitmap(bitmap, srcRect, dstRect, new SKPaint { FilterQuality = SKFilterQuality.High });
+		}
+
+		if (!string.IsNullOrEmpty(overlayPath) && File.Exists(overlayPath))
+		{
+			using var overlayBmp = SKBitmap.Decode(overlayPath);
+			if (overlayBmp != null)
+			{
+				var dst = new SKRect(0, 0, canvasWidth, canvasHeight);
+				canvas.DrawBitmap(overlayBmp, dst, new SKPaint { FilterQuality = SKFilterQuality.High });
+			}
+		}
+
+		canvas.Flush();
+		using var image = surface.Snapshot();
+		using var png = image.Encode(SKEncodedImageFormat.Png, 90);
+		using var fs = File.Open(outputPath, FileMode.Create, FileAccess.Write, FileShare.Read);
+		png.SaveTo(fs);
 	}
 }
 

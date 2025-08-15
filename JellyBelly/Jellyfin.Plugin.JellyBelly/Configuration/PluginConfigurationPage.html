@@ -70,11 +70,6 @@
                     <input id="jb_cfenabled" type="checkbox" /> Enable collaborative filtering (ML.NET)
                 </label>
             </div>
-            <div class="field">
-                <label class="inputLabel" title="Run task once at server startup (for debugging).">
-                    <input id="jb_debugstartup" type="checkbox" /> Run at server startup (debug)
-                </label>
-            </div>
             <div id="cfblend-wrap" class="field" style="display:none;">
                 <label for="jb_cfblend" title="Blend weight of CF vs TF-IDF. 0 means TF-IDF only, 1 means CF only.">Blend weight for CF vs TF-IDF</label>
                 <input id="jb_cfblend" class="emby-input" type="number" min="0" max="1" step="0.05" />
@@ -222,14 +217,14 @@
         }
 
         return function (view, params) {
-            const pluginId = view.getAttribute('data-pluginid') || 'f8fa0c88-7b8f-4c21-9da3-62d0fb1b9a54';
+            const rawId = view.getAttribute('data-pluginid') || 'f8fa0c88-7b8f-4c21-9da3-62d0fb1b9a54';
+            const pluginId = rawId.replace(/-/g, '');
+            const api = (typeof window !== 'undefined' ? window.ApiClient : null);
 
             function loadConfig() {
-                console.log('Loading configuration for plugin:', pluginId);
                 setValues(view, defaults);
-                
-                ApiClient.getPluginConfiguration(pluginId).then(function (cfg) {
-                    console.log('Received configuration:', cfg);
+                if (!api) { console.error('ApiClient unavailable'); return; }
+                api.getPluginConfiguration(pluginId).then(function (cfg) {
                     var merged = Object.assign({}, defaults, cfg || {});
                     setValues(view, merged);
                 }).catch(function (error) {
@@ -240,12 +235,10 @@
 
             function saveConfig() {
                 var cfg = getValues(view);
-                console.log('Saving configuration:', cfg);
+                if (!api) { console.error('ApiClient unavailable'); return; }
                 loading.show();
-                
-                ApiClient.updatePluginConfiguration(pluginId, cfg)
+                api.updatePluginConfiguration(pluginId, cfg)
                     .then(function (result) {
-                        console.log('Configuration saved successfully:', result);
                         if (window.Dashboard && typeof window.Dashboard.processPluginConfigurationUpdateResult === 'function') {
                             window.Dashboard.processPluginConfigurationUpdateResult(result);
                         }
@@ -254,8 +247,7 @@
                         console.error('Failed to save configuration:', error);
                     })
                     .then(function () {
-                        return ApiClient.getPluginConfiguration(pluginId).then(function (cfg) {
-                            console.log('Reloaded configuration after save:', cfg);
+                        return api.getPluginConfiguration(pluginId).then(function (cfg) {
                             var merged = Object.assign({}, defaults, cfg || {});
                             setValues(view, merged);
                         });
