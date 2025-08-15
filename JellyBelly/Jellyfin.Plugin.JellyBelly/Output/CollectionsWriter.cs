@@ -13,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.IO;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.JellyBelly.Output;
 
@@ -23,6 +24,20 @@ public sealed class CollectionsWriter
 {
     private readonly ICollectionManager _collections;
     private readonly ILibraryManager _library;
+    private readonly ILogger _logger;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CollectionsWriter"/> class.
+    /// </summary>
+    /// <param name="collections">The collection manager used to create and modify collections.</param>
+    /// <param name="library">The library manager used to resolve items by identifier.</param>
+    /// <param name="logger">The logger for diagnostic information.</param>
+    public CollectionsWriter(ICollectionManager collections, ILibraryManager library, ILogger logger)
+    {
+        _collections = collections;
+        _library = library;
+        _logger = logger;
+    }
 
     /// <summary>
     /// Unwraps Task/ValueTask results returned by reflection into their underlying value or null.
@@ -75,12 +90,25 @@ public sealed class CollectionsWriter
         /// <param name="dryRun">If true, no changes are written to the server.</param>
     public void UpsertTopPicksCollection(UserRef user, string name, IEnumerable<Guid> itemIds, bool dryRun)
     {
-        if (dryRun) return;
+        _logger.LogInformation("UpsertTopPicksCollection: user={User}, name={Name}, itemCount={ItemCount}, dryRun={DryRun}", 
+            user.Name, name, itemIds.Count(), dryRun);
+        
+        if (dryRun) 
+        {
+            _logger.LogInformation("Dry run mode - no changes will be made");
+            return;
+        }
+        
         var collection = EnsureCollection(user, name);
         var items = itemIds.Select(id => _library.GetItemById(id)).Where(i => i != null).Cast<BaseItem>().ToList();
+        _logger.LogInformation("Resolved {ResolvedCount}/{TotalCount} items for collection {Name}", 
+            items.Count, itemIds.Count(), name);
+        
         AddItemsToCollection(collection, items);
         TrySetMosaicCover(collection, items);
         TryBumpDates(collection);
+        
+        _logger.LogInformation("Top picks collection '{Name}' updated successfully for user {User}", name, user.Name);
     }
 
         /// <summary>
@@ -92,12 +120,25 @@ public sealed class CollectionsWriter
         /// <param name="dryRun">If true, no changes are written to the server.</param>
     public void UpsertBecausePlaylist(UserRef user, string name, IEnumerable<Guid> itemIds, bool dryRun)
     {
-        if (dryRun) return;
+        _logger.LogInformation("UpsertBecausePlaylist: user={User}, name={Name}, itemCount={ItemCount}, dryRun={DryRun}", 
+            user.Name, name, itemIds.Count(), dryRun);
+        
+        if (dryRun) 
+        {
+            _logger.LogInformation("Dry run mode - no changes will be made");
+            return;
+        }
+        
         var playlist = EnsureCollection(user, name);
         var items = itemIds.Select(id => _library.GetItemById(id)).Where(i => i != null).Cast<BaseItem>().ToList();
+        _logger.LogInformation("Resolved {ResolvedCount}/{TotalCount} items for playlist {Name}", 
+            items.Count, itemIds.Count(), name);
+        
         AddItemsToCollection(playlist, items);
         TrySetMosaicCover(playlist, items);
         TryBumpDates(playlist);
+        
+        _logger.LogInformation("Because playlist '{Name}' updated successfully for user {User}", name, user.Name);
     }
 
     private BaseItem EnsureCollection(UserRef user, string name)

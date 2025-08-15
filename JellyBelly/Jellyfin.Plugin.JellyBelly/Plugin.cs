@@ -57,6 +57,12 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             Name = "thumb.png",
             EmbeddedResourcePath = _assembly.GetName().Name + ".wwwroot.jellybelly-card.png"
         };
+        yield return new PluginPageInfo
+        {
+            // Serve image through the /Image endpoint that Jellyfin expects
+            Name = "Image",
+            EmbeddedResourcePath = _assembly.GetName().Name + ".wwwroot.jellybelly-card.png"
+        };
     }
 
     /// <summary>
